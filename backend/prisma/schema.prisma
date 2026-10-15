@@ -1,0 +1,217 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AssetClass {
+  STOCK
+  FII
+  FUND
+  TREASURY
+  OTHER
+}
+
+enum DataSource {
+  MANUAL
+  BRAPI
+}
+
+enum TxType {
+  BUY
+  SELL
+}
+
+enum DividendKind {
+  DIVIDEND
+  JCP
+  RENDIMENTO
+  AMORTIZACAO
+  OTHER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String?
+  assets        Asset[]
+  portfolios    Portfolio[]
+  transactions  Transaction[]
+  dividends     Dividend[]
+  syncLogs      SyncLog[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([email])
+}
+
+model Asset {
+  id         String          @id @default(cuid())
+  symbol     String          @unique
+  name       String
+  assetClass AssetClass
+  source     DataSource      @default(MANUAL)
+  currency   String          @default("BRL")
+  logoUrl    String?
+  active     Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  userId     String
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prices     PriceBar[]
+  quotes     QuoteSnapshot[]
+  dividends  Dividend[]
+  txs        Transaction[]
+  indicators FiiIndicator[]
+  fundSnapshot FundIndicator?
+
+  @@index([assetClass])
+  @@index([userId])
+}
+
+model PriceBar {
+  id            String     @id @default(cuid())
+  assetId       String
+  date          DateTime   @db.Date
+  open          Decimal?   @db.Decimal(18, 6)
+  high          Decimal?   @db.Decimal(18, 6)
+  low           Decimal?   @db.Decimal(18, 6)
+  close         Decimal?   @db.Decimal(18, 6)
+  adjustedClose Decimal?   @db.Decimal(18, 6)
+  volume        BigInt?
+  source        DataSource @default(MANUAL)
+  asset         Asset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, date, source])
+  @@index([assetId, date])
+}
+
+model QuoteSnapshot {
+  id            String     @id @default(cuid())
+  assetId       String
+  price         Decimal    @db.Decimal(18, 6)
+  change        Decimal?   @db.Decimal(18, 6)
+  changePercent Decimal?   @db.Decimal(10, 6)
+  dayHigh       Decimal?   @db.Decimal(18, 6)
+  dayLow        Decimal?   @db.Decimal(18, 6)
+  volume        BigInt?
+  marketCap     Decimal?   @db.Decimal(24, 2)
+  quotedAt      DateTime
+  source        DataSource @default(BRAPI)
+  asset         Asset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId, quotedAt])
+}
+
+model Dividend {
+  id            String       @id @default(cuid())
+  assetId       String
+  kind          DividendKind @default(DIVIDEND)
+  amountPerUnit Decimal      @db.Decimal(18, 8)
+  exDate        DateTime?    @db.Date
+  paymentDate   DateTime     @db.Date
+  source        DataSource   @default(MANUAL)
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  asset         Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, paymentDate, kind, amountPerUnit]) // idempotência do sync da brapi
+  @@index([assetId, paymentDate])
+  @@index([userId])
+}
+
+model Portfolio {
+  id        String   @id @default(cuid())
+  name      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  txs       Transaction[]
+
+  @@index([userId])
+}
+
+model Transaction {
+  id          String    @id @default(cuid())
+  portfolioId String
+  assetId     String
+  type        TxType
+  quantity    Decimal   @db.Decimal(18, 8)
+  unitPrice   Decimal   @db.Decimal(18, 6)
+  fees        Decimal   @default(0) @db.Decimal(18, 6)
+  tradedAt    DateTime  @db.Date
+  notes       String?
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  asset       Asset     @relation(fields: [assetId], references: [id])
+
+  @@index([portfolioId, tradedAt])
+  @@index([userId])
+}
+
+model SyncLog {
+  id         String   @id @default(cuid())
+  operation  String
+  symbols    String[]
+  status     String
+  httpStatus Int?
+  message    String?
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+model MacroPoint {
+  id    String   @id @default(cuid())
+  slug  String
+  date  DateTime @db.Date
+  value Decimal? @db.Decimal(18, 6)
+  unit  String?
+
+  @@unique([slug, date])
+  @@index([slug, date])
+}
+
+model FiiIndicator {
+  id              String    @id @default(cuid())
+  assetId         String
+  referenceDate   DateTime  @db.Date
+  price           Decimal?  @db.Decimal(18, 6)
+  navPerShare     Decimal?  @db.Decimal(18, 6)
+  priceToNav      Decimal?  @db.Decimal(10, 6)
+  dy12m           Decimal?  @db.Decimal(10, 6)
+  dy1m            Decimal?  @db.Decimal(10, 6)
+  monthlyReturn   Decimal?  @db.Decimal(10, 6)
+  totalInvestors  BigInt?
+  shares          BigInt?
+  equity          Decimal?  @db.Decimal(24, 2)
+  segment         String?
+  source          DataSource @default(BRAPI)
+  asset           Asset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, referenceDate])
+  @@index([assetId, referenceDate])
+}
+
+model FundIndicator {
+  id              String    @id @default(cuid())
+  assetId         String    @unique
+  asOfDate        DateTime? @db.Date
+  price           Decimal?  @db.Decimal(18, 6)
+  navPerShare     Decimal?  @db.Decimal(18, 6)
+  priceToNav      Decimal?  @db.Decimal(10, 6)
+  equity          Decimal?  @db.Decimal(24, 2)
+  totalInvestors  BigInt?
+  monthlyReturn   Decimal?  @db.Decimal(10, 6)
+  dyMonthly       Decimal?  @db.Decimal(10, 6)
+  source          DataSource @default(BRAPI)
+  updatedAt       DateTime  @updatedAt
+  asset           Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+}

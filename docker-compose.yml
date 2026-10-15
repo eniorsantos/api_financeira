@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: finance
+      POSTGRES_PASSWORD: finance
+      POSTGRES_DB: finance
+    ports: ["5433:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+
+  backend:
+    build: ./backend
+    ports: ["3333:3333"]
+    environment:
+      DATABASE_URL: postgresql://finance:finance@db:5432/finance
+      BRAPI_TOKEN: ${BRAPI_TOKEN}
+      PORT: 3333
+      WEB_ORIGIN: http://localhost:5173
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+      SYNC_ENABLED: 1
+    depends_on:
+      db:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    ports: ["5173:80"]
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  pgdata:

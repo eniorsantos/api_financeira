@@ -1,0 +1,40 @@
+{
+    "name": "finance-backend",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "tsx watch src/server.ts",
+        "build": "tsc -p .",
+        "typecheck": "tsc --noEmit -p .",
+        "test": "vitest run",
+        "db:migrate": "prisma migrate dev",
+        "brapi:smoke": "tsx src/scripts/smoke.ts",
+        "lint": "eslint src",
+        "format": "prettier --write \"src/**/*.ts\" \"../docs/*.md\""
+    },
+    "dependencies": {
+        "@fastify/cors": "^10.0.0",
+        "@fastify/jwt": "^10.2.4",
+        "@fastify/swagger": "^9.9.2",
+        "@fastify/swagger-ui": "^5.2.6",
+        "@prisma/client": "^6.0.0",
+        "bcryptjs": "^3.0.3",
+        "exceljs": "^4.4.0",
+        "fastify": "^5.0.0",
+        "pdfkit": "^0.20.2",
+        "zod": "^3.23.8"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.39.5",
+        "@types/bcryptjs": "^2.4.6",
+        "@types/node": "^22.0.0",
+        "@types/pdfkit": "^0.17.6",
+        "eslint": "^9.39.5",
+        "prettier": "^3.9.10",
+        "prisma": "^6.0.0",
+        "tsx": "^4.19.0",
+        "typescript": "^5.6.0",
+        "typescript-eslint": "^8.71.2",
+        "vitest": "^2.1.0"
+    }
+}
